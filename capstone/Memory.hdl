@@ -1,0 +1,13 @@
+CHIP Memory {
+    IN in[16], load, address[15];
+    OUT out[16];
+    PARTS:
+    Dmux8Way(in=load, sel=address[13..14], a=loadRAM1, b=loadRAM2, c=loadRAM3, d=loadRAM4, e=loadScreen, f=loadKeyboard, g=unused1, h=unused2);
+    Or(a=loadRAM1, b=loadRAM2, out=loadRAM12);
+    Or(a=loadRAM3, b=loadRAM4, out=loadRAM34);
+    Or(a=loadRAM12, b=loadRAM34, out=loadRAM);
+    RAM16K(in=in, load=loadRAM, address=address[0..13], out=ramOut);
+    Screen(in=in, load=loadScreen, address=address[0..12], out=screenOut);
+    Keyboard(out=keyboardOut);
+    Mux4Way16(a=ramOut, b=ramOut, c=screenOut, d=keyboardOut, sel=address[13..14], out=out);
+}
