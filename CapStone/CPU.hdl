@@ -1,25 +1,60 @@
 CHIP CPU {
-    IN inM[16], instruction[16], reset;
-    OUT outM[16], writeM, addressM[15], pc[15];
+    IN  inM[16],         // M value input (M = contents of RAM[A])
+        instruction[16], // Instruction for execution
+        reset;           // Signals whether to restart the current program
+
+    OUT outM[16],        // M value output
+        writeM,          // Write to M?
+        addressM[15],    // Address in data memory (of M)
+        pc[15];          // Address of next instruction
 
     PARTS:
-    Not(in=instruction[15], out=isA);
-    Mux16(a=aluOut, b=instruction, sel=isA, out=aIn);
-    Or(a=isA, b=instruction[5], out=loadA);
-    ARegister(in=aIn, load=loadA, out=aOut, out[0..14]=addressM);
-    Mux16(a=aOut, b=inM, sel=instruction[12], out=aluY);
+    // Decode instruction type: 0 = A-instruction, 1 = C-instruction
+    Not(in=instruction[15], out=isAInstruction);
+
+    // A-register input and load control (load on A-instruction or C-instruction with d1=1)
+    Mux16(a=instruction, b=aluOut, sel=instruction[15], out=inAReg);
+    And(a=instruction[15], b=instruction[5], out=destA);
+    Or(a=isAInstruction, b=destA, out=loadA);
+    ARegister(in=inAReg, load=loadA, out=outA, out[0..14]=addressM);
+
+    // D-register load control (C-instruction with d2=1)
     And(a=instruction[15], b=instruction[4], out=loadD);
-    DRegister(in=aluOut, load=loadD, out=dOut);
-    ALU(x=dOut, y=aluY, zx=instruction[11], nx=instruction[10], zy=instruction[9], ny=instruction[8], f=instruction[7], no=instruction[6], out=aluOut, out=outM, zr=zr, ng=ng);
+    DRegister(in=aluOut, load=loadD, out=outD);
+
+    // Select ALU y-input: A-register (a=0) or inM (a=1)
+    Mux16(a=outA, b=inM, sel=instruction[12], out=aluY);
+
+    // ALU execution
+    ALU(
+        x=outD,
+        y=aluY,
+        zx=instruction[11],
+        nx=instruction[10],
+        zy=instruction[9],
+        ny=instruction[8],
+        f=instruction[7],
+        no=instruction[6],
+        out=aluOut,
+        out=outM,
+        zr=zr,
+        ng=ng
+    );
+
+    // Memory write control (C-instruction with d3=1)
     And(a=instruction[15], b=instruction[3], out=writeM);
-    Not(in=zr, out=notZr);
-    Not(in=ng, out=notNg);
-    And(a=notZr, b=notNg, out=pos);
-    And(a=instruction[2], b=ng, out=j1);
-    And(a=instruction[1], b=zr, out=j2);
-    And(a=instruction[0], b=pos, out=j3);
-    Or(a=j1, b=j2, out=j12);
-    Or(a=j12, b=j3, out=jmp);
-    And(a=instruction[15], b=jmp, out=loadPC);
-    PC(in=aOut, load=loadPC, inc=true, reset=reset, out[0..14]=pc);
+
+    // Jump condition evaluation (j1: <0, j2: ==0, j3: >0)
+    And(a=instruction[2], b=ng, out=jlt);
+    And(a=instruction[1], b=zr, out=jeq);
+    Or(a=ng, b=zr, out=ngOrZr);
+    Not(in=ngOrZr, out=pos);
+    And(a=instruction[0], b=pos, out=jgt);
+
+    Or(a=jlt, b=jeq, out=jle);
+    Or(a=jle, b=jgt, out=jumpCond);
+    And(a=instruction[15], b=jumpCond, out=pcLoad);
+
+    // Program Counter
+    PC(in=outA, load=pcLoad, inc=true, reset=reset, out[0..14]=pc);
 }
