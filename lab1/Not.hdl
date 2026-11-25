@@ -6,10 +6,12 @@
  * Not gate:
  * if (in) out = 0, else out = 1
  */
-CHIP Not {
+CHIP Not { 
+    //names (no change)
     IN in;
     OUT out;
-
-    PARTS:
-    Nand(a=in, b=in, out=out);
+    //actual implementation
+    PARTS: 
+    Nand(a=in , b=in , out=out);
+    //// Replace this comment with your code.
 }

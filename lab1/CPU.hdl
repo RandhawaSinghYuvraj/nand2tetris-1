@@ -1,0 +1,56 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/5/CPU.hdl
+
+CHIP CPU {
+
+    IN  inM[16],         
+        instruction[16],
+        reset;          
+                         
+                         
+    OUT outM[16],        
+        writeM,          
+        addressM[15],    
+        pc[15];         
+   
+
+    PARTS:
+    Not(in=instruction[15], out=aInstruction);
+    
+   
+    And(a=instruction[15], b=instruction[5], out=cToA);
+    Or(a=aInstruction, b=cToA, out=loadA);
+    Mux16(a=instruction, b=aluOut, sel=instruction[15], out=aIn);
+    ARegister(in=aIn, load=loadA, out=aOut, out[0..14]=addressM);
+    
+   
+    And(a=instruction[15], b=instruction[4], out=loadD);
+    DRegister(in=aluOut, load=loadD, out=dOut);
+    
+
+    Mux16(a=aOut, b=inM, sel=instruction[12], out=aluY);
+    
+
+    ALU(x=dOut, y=aluY,
+        zx=instruction[11], nx=instruction[10],
+        zy=instruction[9],  ny=instruction[8],
+        f=instruction[7],   no=instruction[6],
+        out=aluOut, out=outM, zr=zrOut, ng=ngOut);
+    
+    And(a=instruction[15], b=instruction[3], out=writeM);
+
+    And(a=ngOut, b=instruction[2], out=jlt);
+    And(a=zrOut, b=instruction[1], out=jeq);
+    Or(a=ngOut, b=zrOut, out=notPos);
+    Not(in=notPos, out=pos);
+    And(a=pos, b=instruction[0], out=jgt);
+    Or(a=jlt, b=jeq, out=j1);
+    Or(a=j1, b=jgt, out=jump);
+    And(a=instruction[15], b=jump, out=doJump);
+    
+    // PC
+    Not(in=doJump, out=noJump);
+    PC(in=aOut, load=doJump, inc=noJump, reset=reset, out[0..14]=pc);
+}
